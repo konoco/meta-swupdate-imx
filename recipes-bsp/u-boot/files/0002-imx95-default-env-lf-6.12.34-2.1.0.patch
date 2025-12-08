@@ -1,0 +1,88 @@
+Upstream-Status: Inappropriate [i.MX swupdate specific enablement]
+Signed-off-by: Anda-Alexandra Despotovici <anda-alexandra.dorneanu@nxp.com>
+
+diff --git a/board/freescale/imx95_evk/imx95_evk.c b/board/freescale/imx95_evk/imx95_evk.c
+index 1fdd4b8faff..40eb7870b32 100644
+--- a/board/freescale/imx95_evk/imx95_evk.c
++++ b/board/freescale/imx95_evk/imx95_evk.c
+@@ -22,6 +22,8 @@
+ #include <i2c.h>
+ #include <dm/uclass.h>
+ #include <dm/uclass-internal.h>
++#include <timestamp.h>
++#include <version.h>
+ 
+ extern int board_fix_fdt_fuse(void *fdt);
+ 
+@@ -489,7 +491,7 @@ int board_late_init(void)
+ #ifdef CONFIG_AHAB_BOOT
+ 	env_set("sec_boot", "yes");
+ #endif
+-
++	env_set("u-boot_version", PLAIN_VERSION"("U_BOOT_DATE"-"U_BOOT_TIME")");
+ 	return 0;
+ }
+ 
+diff --git a/board/freescale/imx95_evk/imx95_evk.env b/board/freescale/imx95_evk/imx95_evk.env
+index cf3d35e67fe..a7dca6fabc4 100644
+--- a/board/freescale/imx95_evk/imx95_evk.env
++++ b/board/freescale/imx95_evk/imx95_evk.env
+@@ -86,6 +86,7 @@ mmcpart=1
+ mmcroot=/dev/mmcblk1p2 rootwait rw
+ mmcautodetect=yes
+ mmcargs=setenv bootargs ${jh_clk} ${mcore_args} console=${console} root=${mmcroot}
++		cur_slot=${bootslot} U-Boot_ver=${u-boot_version}
+ prepare_mcore=setenv mcore_args pd_ignore_unused;
+ loadbootscript=fatload mmc ${mmcdev}:${mmcpart} ${loadaddr} ${script};
+ bootscript=echo Running bootscript from mmc ...; source
+@@ -133,7 +134,50 @@ netboot=echo Booting from net ...;
+ 				fi;
+ 			fi;
+ 		fi;
++bootslot=dualA
++u-boot_version=null
++usb_port=1
++post_opt=saveenv
++adjustbootsource=if test ${bootslot} = dualA || test ${bootslot} = singlenormal; then
++					run adjustbootsourceA;
++				fi;
++				if test ${bootslot} = dualB; then
++					run adjustbootsourceB;
++				fi;
++altbootusb=echo Boot Fail! Get into usb fastboot download.;fastboot usb ${usb_port}
++altbootsingle=if test ${bootslot} = singlerescue; then
++				run altbootusb;
++			fi;
++			if test ${bootslot} = singlenormal; then
++				run swuboot;
++			fi;
++adjustbootsourceB=echo RootFs Slot B; setenv mmcpart 3; setenv mmcroot /dev/mmcblk${mmcdev}p4 rootwait rw
++adjustbootsourceA=echo RootFs Slot A; setenv mmcpart 1; setenv mmcroot /dev/mmcblk${mmcdev}p2 rootwait rw
++altbootRollbackB=echo Rolling back to slot dualB; setenv bootslot dualB; run post_opt; run bootcmd
++altbootRollbackA=echo Rolling back to slot dualA; setenv bootslot dualA; run post_opt; run bootcmd
++altbootdual=if test ${bootslot} = dualA; then
++				run altbootRollbackB;
++			fi;
++			if test ${bootslot} = dualB; then
++				run altbootRollbackA;
++			fi;
++swuargs=setenv bootargs console=${console},${baudrate} earlycon=${earlycon},${baudrate}
++        cur_slot=${bootslot} U-Boot_ver=${u-boot_version}
++loadswuimage=mmc read  ${loadaddr} 0x4000 0x15000
++loadswufdt=mmc read  ${fdt_addr} 0x19000 0x200
++loadswuramdisk=mmc read  ${initrd_addr} 0x1B000 0x21000
++swuboot=echo swuboot ramdisk; run loadswuimage; run loadswufdt; run loadswuramdisk; run swuargs; booti ${loadaddr} ${initrd_addr} ${fdt_addr}
++altbootcmd=if test ${bootslot} = singlerescue || test ${bootslot} = singlenormal; then
++				run altbootsingle;
++			fi;
++			if test ${bootslot} = dualA || test ${bootslot} = dualB; then
++				run altbootdual;
++			fi;
+ bsp_bootcmd=echo Running BSP bootcmd ...;
++			if test ${bootslot} = singlerescue; then
++				run swuboot;
++			fi;
++			run adjustbootsource;
+ 			mmc dev ${mmcdev}; if mmc rescan; then
+ 			if run loadbootscript; then
+ 				run bootscript;
