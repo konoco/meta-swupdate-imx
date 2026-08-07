@@ -33,8 +33,8 @@ do_install:append:mx8mm-nxp-bsp () {
 # append for imx8mp
 do_install:append:mx8mp-nxp-bsp () {
 
-    echo "/dev/mmcblk1 0x400000 0x4000" > ${D}/${sysconfdir}/fw_env.config
-    echo "/dev/mmcblk1 0x404000 0x4000" >> ${D}/${sysconfdir}/fw_env.config
+    echo "/dev/mmcblk2 0x400000 0x4000" > ${D}/${sysconfdir}/fw_env.config
+    echo "/dev/mmcblk2 0x404000 0x4000" >> ${D}/${sysconfdir}/fw_env.config
     echo "${MACHINE} ${SWU_HW_REV}" > ${D}/${sysconfdir}/hwrevision
 
 }
